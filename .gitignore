@@ -2,5 +2,6 @@ venv/
 __pycache__/
 *.pyc
 chroma_data/
+startups.xlsx
 .env
 .env.local

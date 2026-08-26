@@ -5,6 +5,8 @@ from langchain_ollama import OllamaLLM
 from langchain_core.prompts import PromptTemplate
 import chromadb
 from sentence_transformers import SentenceTransformer
+import threading
+import time
 
 app = FastAPI()
 
@@ -90,6 +92,18 @@ Gerçek, var olan benzer projeler (referans amaçlı):
 # (proje_id -> {"status": "processing" / "done" / "error", ...})
 job_store: dict[str, dict] = {}
 
+JOB_TIMEOUT_SECONDS = 300  # 5 dakika
+
+
+def timeout_kontrolcusu(project_id: str):
+    """Belirtilen süre sonunda iş hâlâ 'processing' ise, hata durumuna düşürür."""
+    time.sleep(JOB_TIMEOUT_SECONDS)
+    if job_store.get(project_id, {}).get("status") == "processing":
+        job_store[project_id] = {
+            "status": "error",
+            "message": "İşlem zaman aşımına uğradı (5 dakika). Lütfen tekrar deneyin.",
+        } #zaman aşımı management
+
 
 def generate_prd_task(project_id: str, title: str, raw_idea: str):
     try:
@@ -136,6 +150,13 @@ def prd_uret_baslat(request: FikirRequest, background_tasks: BackgroundTasks):
     background_tasks.add_task(
         generate_prd_task, request.project_id, request.title, request.raw_idea
     )
+
+    # Zaman aşımı kontrolcüsünü ayrı bir thread'de başlat
+    timeout_thread = threading.Thread(
+        target=timeout_kontrolcusu, args=(request.project_id,), daemon=True
+    )
+    timeout_thread.start()
+
     return {"status": "started"}
 
 

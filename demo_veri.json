@@ -1,0 +1,39 @@
+{
+  "developers": [
+    {"full_name": "Ahmet Yılmaz", "bio": "5 yıllık deneyimli full-stack geliştirici, özellikle React ve Node.js ekosisteminde uzmanlaşmıştır.", "skills": ["React", "Node.js", "PostgreSQL", "TypeScript"]},
+    {"full_name": "Elif Kaya", "bio": "Mobil uygulama geliştirme konusunda 3 yıllık deneyime sahip, hem iOS hem Android platformlarında çalışıyor.", "skills": ["React Native", "Swift", "Kotlin", "Firebase"]},
+    {"full_name": "Mehmet Demir", "bio": "Backend sistemleri ve veritabanı mimarisi üzerine odaklanan kıdemli yazılım mühendisi.", "skills": ["Python", "Django", "PostgreSQL", "Docker"]},
+    {"full_name": "Zeynep Arslan", "bio": "UI/UX tasarımı ile kodlamayı birleştiren, kullanıcı deneyimine önem veren frontend geliştirici.", "skills": ["React", "Figma", "TailwindCSS", "JavaScript"]},
+    {"full_name": "Can Öztürk", "bio": "E-ticaret platformları konusunda uzmanlaşmış, ölçeklenebilir sistemler kuran yazılımcı.", "skills": ["Java", "Spring Boot", "MySQL", "AWS"]},
+    {"full_name": "Selin Yıldız", "bio": "Yapay zeka ve makine öğrenmesi projelerinde 4 yıllık deneyimi olan veri bilimci ve geliştirici.", "skills": ["Python", "TensorFlow", "FastAPI", "Pandas"]},
+    {"full_name": "Burak Şahin", "bio": "DevOps ve bulut altyapısı konusunda deneyimli, CI/CD süreçlerini optimize eden mühendis.", "skills": ["Kubernetes", "Docker", "AWS", "Terraform"]},
+    {"full_name": "Ayşe Çelik", "bio": "Sağlık teknolojileri alanında projeler geliştiren, veri güvenliğine önem veren yazılımcı.", "skills": ["Node.js", "MongoDB", "React", "Express"]},
+    {"full_name": "Emre Aydın", "bio": "Oyun geliştirme ve interaktif uygulamalar konusunda tutkulu, Unity uzmanı geliştirici.", "skills": ["Unity", "C#", "Blender", "Git"]},
+    {"full_name": "Deniz Koç", "bio": "Fintech alanında çalışan, güvenlik odaklı backend geliştirme konusunda deneyimli mühendis.", "skills": ["Go", "PostgreSQL", "Redis", "Docker"]},
+    {"full_name": "Gizem Aksoy", "bio": "Eğitim teknolojileri projelerinde çalışan, erişilebilirliğe önem veren full-stack geliştirici.", "skills": ["Vue.js", "Laravel", "MySQL", "PHP"]},
+    {"full_name": "Onur Kurt", "bio": "IoT ve gömülü sistemler konusunda deneyimli, donanım-yazılım entegrasyonunda uzman mühendis.", "skills": ["C++", "Python", "Raspberry Pi", "MQTT"]},
+    {"full_name": "Merve Doğan", "bio": "Sosyal medya ve topluluk platformları geliştiren, gerçek zamanlı sistemler konusunda deneyimli.", "skills": ["Node.js", "Socket.io", "React", "Redis"]},
+    {"full_name": "Kerem Polat", "bio": "Tarım teknolojileri ve sürdürülebilirlik odaklı projeler geliştiren yazılım mühendisi.", "skills": ["Python", "Django", "PostgreSQL", "React"]},
+    {"full_name": "Nazlı Er", "bio": "Lojistik ve tedarik zinciri yazılımları konusunda deneyimli, harita/konum tabanlı sistemler geliştiriyor.", "skills": ["Java", "Spring Boot", "Google Maps API", "MySQL"]}
+  ],
+  "founders": [
+    {"full_name": "Fatma Öz"},
+    {"full_name": "Ali Vural"},
+    {"full_name": "Ceren Bulut"},
+    {"full_name": "Serkan Ünal"},
+    {"full_name": "Aslı Tekin"},
+    {"full_name": "Barış Güneş"},
+    {"full_name": "Yasemin Ak"},
+    {"full_name": "Tolga Bayram"}
+  ],
+  "projects": [
+    {"title": "Yaşlı Bireyler İçin İlaç Hatırlatma ve Takip Uygulaması", "raw_idea": "Yaşlı bireylerin ilaçlarını zamanında almasını sağlayan, aile üyelerine bildirim gönderen basit ve büyük yazı tipli bir mobil uygulama. Kullanıcı ilaç saatini kaçırırsa yakınlarına otomatik uyarı gider.", "required_skills": ["React Native", "Firebase", "Push Notification"]},
+    {"title": "Öğrenciler Arası Ders Notu Paylaşım Platformu", "raw_idea": "Üniversite öğrencilerinin ders notlarını, özetlerini ve sınav sorularını paylaşabileceği, konuya göre filtrelenebilir bir platform. Kaliteli içerik üreten kullanıcılar puan kazanır.", "required_skills": ["React", "Node.js", "PostgreSQL"]},
+    {"title": "Yerel Üreticiden Doğrudan Alışveriş Uygulaması", "raw_idea": "Küçük çiftçilerin ve yerel üreticilerin ürünlerini aracısız olarak tüketiciye satabileceği bir pazar yeri uygulaması. Konum bazlı teslimat ve haftalık abonelik kutuları içerir.", "required_skills": ["Vue.js", "Laravel", "Google Maps API"]},
+    {"title": "Evcil Hayvan Sahipleri İçin Veteriner Randevu Sistemi", "raw_idea": "Evcil hayvan sahiplerinin yakınlarındaki veterinerlerden online randevu alabileceği, aşı takvimini hatırlatan bir uygulama. Veterinerler de kendi takvimlerini yönetebilir.", "required_skills": ["React", "Express", "MongoDB"]},
+    {"title": "Freelance Tasarımcılar İçin Portfolyo ve İş Bulma Platformu", "raw_idea": "Grafik tasarımcıların portfolyolarını sergileyip, işverenlerin ilan verebileceği, doğrudan mesajlaşma içeren bir platform. Değerlendirme ve puanlama sistemi olacak.", "required_skills": ["Next.js", "TailwindCSS", "PostgreSQL"]},
+    {"title": "Ev İçi Enerji Tüketimi Takip ve Tasarruf Uygulaması", "raw_idea": "Kullanıcıların elektrik faturalarını fotoğraflayarak yükleyip, aylık tüketim trendlerini görebileceği, tasarruf önerileri sunan bir uygulama.", "required_skills": ["Python", "FastAPI", "React"]},
+    {"title": "Toplu Taşıma Kullanıcıları İçin Gerçek Zamanlı Doluluk Bildirimi", "raw_idea": "Otobüs ve metro hatlarındaki doluluk oranını kullanıcı raporlarıyla gösteren, yoğun saatlerde alternatif güzergah öneren bir uygulama.", "required_skills": ["React Native", "Node.js", "Redis"]},
+    {"title": "Küçük İşletmeler İçin Basit Stok ve Sipariş Takip Sistemi", "raw_idea": "Esnaf ve küçük işletme sahiplerinin ürün stoklarını, siparişlerini ve basit gelir-gider kayıtlarını tek bir yerden takip edebileceği kullanıcı dostu bir web uygulaması.", "required_skills": ["React", "Django", "PostgreSQL"]}
+  ]
+}
