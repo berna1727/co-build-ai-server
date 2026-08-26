@@ -1,0 +1,39 @@
+#!/bin/sh
+# Sir sizmasini commit aninda engelleyen kontrol.
+# Etkinlestirme:  git config core.hooksPath .githooks
+# Acil durumda atlatma:  git commit --no-verify   (tavsiye edilmez)
+
+hata=0
+
+# 1) Ortam dosyalarinin staged olmasini engelle (.env.example haric)
+env_dosyalari=$(git diff --cached --name-only --diff-filter=ACM \
+  | grep -E '(^|/)\.env' | grep -v '\.env\.example$')
+if [ -n "$env_dosyalari" ]; then
+  echo "ENGELLENDI: ortam dosyasi commit edilmek uzere:"
+  echo "$env_dosyalari" | sed 's/^/  - /'
+  echo "  Cozum: git rm --cached <dosya>"
+  hata=1
+fi
+
+# 2) Staged icerikte sir kalibi ara
+kalip='sb_secret_[A-Za-z0-9_-]{8,}|sb_publishable_[A-Za-z0-9_-]{8,}|eyJ[A-Za-z0-9_-]{15,}\.eyJ[A-Za-z0-9_-]{15,}|-----BEGIN [A-Z ]*PRIVATE KEY-----'
+
+for dosya in $(git diff --cached --name-only --diff-filter=ACM); do
+  case "$dosya" in
+    .env.example|*/.env.example|.githooks/*) continue ;;
+  esac
+  bulgu=$(git show ":$dosya" 2>/dev/null | grep -aoE "$kalip" | head -1)
+  if [ -n "$bulgu" ]; then
+    # Bulguyu ekrana tam basmiyoruz; sadece ilk 12 karakter.
+    echo "ENGELLENDI: '$dosya' icinde sir kalibi bulundu ($(printf '%s' "$bulgu" | cut -c1-12)...)"
+    hata=1
+  fi
+done
+
+if [ "$hata" -ne 0 ]; then
+  echo ""
+  echo "Commit iptal edildi. Sirlari .env dosyasina tasiyin (.env git tarafindan yok sayilir)."
+  exit 1
+fi
+
+exit 0

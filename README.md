@@ -56,6 +56,34 @@ Performs a semantic search against a vector database of real startup description
 | Embeddings | `sentence-transformers` (`all-MiniLM-L6-v2`) |
 | Vector store | ChromaDB |
  
+## Environment Variables
+ 
+Secrets are never committed. Copy the template and fill in your own values:
+ 
+```bash
+cp .env.example .env
+```
+ 
+| Variable | Required | Description |
+|---|---|---|
+| `SUPABASE_URL` | for seeding | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | for seeding | Supabase secret key. Bypasses Row Level Security — server-side only, never exposed to a client |
+| `DEMO_USER_PASSWORD` | no | Password for generated demo accounts (default: `DemoSifre123!`) |
+| `DEMO_SEED_ONAY` | no | Set to `true` to skip the interactive confirmation prompt when seeding |
+ 
+The AI service itself (`main.py`) requires no secrets — it talks only to a local Ollama instance and a local ChromaDB. The Supabase credentials are used exclusively by the optional `demo_kullanici_uret.py` seeding script.
+ 
+### Secret Protection
+ 
+- `.gitignore` blocks `.env` and every `.env.*` variant, allowing only `.env.example` through
+- A `pre-commit` hook in `.githooks/` refuses any commit containing an env file or a secret-shaped string. Enable it once per clone:
+ 
+```bash
+git config core.hooksPath .githooks
+```
+ 
+- `demo_kullanici_uret.py` fails fast on missing variables, redacts secrets from all error output, and requires explicit confirmation before writing to a database with admin privileges
+ 
 ## Setup
  
 **Prerequisites:** Python 3.11+, [Ollama](https://ollama.com) installed with the `llama3.1:8b` model pulled.

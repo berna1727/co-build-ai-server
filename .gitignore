@@ -1,7 +1,22 @@
+# --- Python ---
 venv/
+.venv/
 __pycache__/
 *.pyc
+
+# --- Buyuk veri / uretilen artefaktlar ---
 chroma_data/
 startups.xlsx
+
+# --- Ortam degiskenleri ---
+# Gercek sirlar ASLA commit'lenmez. Sadece .env.example sablonu takip edilir.
 .env
-.env.local
+.env.*
+!.env.example
+
+# --- Diger kimlik bilgisi dosyalari ---
+*.pem
+*.key
+*.p12
+secrets.json
+service-account*.json
