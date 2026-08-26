@@ -100,7 +100,6 @@ POST /prd-uret-baslat
 ## Known Limitations
  
 - Inference runs without GPU acceleration; generation time varies with hardware
-- Job status is stored in memory only; in-progress jobs are lost if the server restarts
 - Concurrent requests can increase processing time
 ## Data Source & License
  
