@@ -7,6 +7,10 @@ import chromadb
 from sentence_transformers import SentenceTransformer
 import threading
 import time
+import queue
+from matchmaking_engine import AramaHatasi, hibrit_eslestirme_yap
+from eslestirme_endpoints import router as eslestirme_router
+
 
 app = FastAPI()
 
@@ -16,6 +20,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(eslestirme_router)
 
 llm = OllamaLLM(model="llama3.1:8b", num_predict=2048)
 
@@ -91,6 +97,21 @@ Gerçek, var olan benzer projeler (referans amaçlı):
 # İş durumlarını geçici olarak bellekte tutan basit bir depo
 # (proje_id -> {"status": "processing" / "done" / "error", ...})
 job_store: dict[str, dict] = {}
+# İstekleri sırayla işlemek için kuyruk
+istek_kuyrugu: queue.Queue = queue.Queue()
+
+
+def kuyruk_isleyici():
+    """Kuyruktaki işleri tek tek, sırayla işler. Sonsuz döngüde arka planda çalışır."""
+    while True:
+        project_id, title, raw_idea = istek_kuyrugu.get()
+        generate_prd_task(project_id, title, raw_idea)
+        istek_kuyrugu.task_done()
+
+
+# Kuyruk işleyiciyi, uygulama başlarken TEK BİR arka plan thread'inde başlat
+kuyruk_thread = threading.Thread(target=kuyruk_isleyici, daemon=True)
+kuyruk_thread.start()
 
 JOB_TIMEOUT_SECONDS = 300  # 5 dakika
 
@@ -130,10 +151,30 @@ def generate_prd_task(project_id: str, title: str, raw_idea: str):
             prd_text = result
             skills_list = []
 
+        try:
+            onerilen_gelistiriciler = [
+                {
+                    "developer_id": s.developer_id,
+                    "ad_soyad": s.ad_soyad,
+                    "skills": s.skills,
+                    "bio": s.bio,
+                    "benzerlik_skoru": s.benzerlik_skoru,
+                    "hibrit_skor": s.hibrit_skor,
+                }
+                for s in hibrit_eslestirme_yap(
+                    prd_metni=prd_text, gerekli_diller=skills_list, top_k=5
+                )
+            ]
+        except AramaHatasi as e:
+            print(f"[eşleştirme motoru] PRD kaydedildi ama eşleştirme başarısız oldu: {e}")
+            onerilen_gelistiriciler = []
+
+
         job_store[project_id] = {
             "status": "done",
             "prd": prd_text,
             "skills": skills_list,
+            "onerilen_gelistiriciler": onerilen_gelistiriciler,
         }
     except Exception as e:
         job_store[project_id] = {"status": "error", "message": str(e)}
@@ -146,18 +187,20 @@ def read_root():
 
 @app.post("/prd-uret-baslat")
 def prd_uret_baslat(request: FikirRequest, background_tasks: BackgroundTasks):
-    job_store[request.project_id] = {"status": "processing"}
-    background_tasks.add_task(
-        generate_prd_task, request.project_id, request.title, request.raw_idea
-    )
+    kuyruktaki_sira = istek_kuyrugu.qsize()
+    job_store[request.project_id] = {
+        "status": "processing",
+        "kuyruk_sirasi": kuyruktaki_sira,
+    }
 
-    # Zaman aşımı kontrolcüsünü ayrı bir thread'de başlat
+    istek_kuyrugu.put((request.project_id, request.title, request.raw_idea))
+
     timeout_thread = threading.Thread(
         target=timeout_kontrolcusu, args=(request.project_id,), daemon=True
     )
     timeout_thread.start()
 
-    return {"status": "started"}
+    return {"status": "started", "kuyruk_sirasi": kuyruktaki_sira}
 
 
 @app.get("/prd-durum/{project_id}")
