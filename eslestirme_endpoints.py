@@ -57,6 +57,8 @@ class GelistiriciVektorleIstek(BaseModel):
     uzmanlik_alanlari: list[str] = Field(default_factory=list, description="Örn: ['Backend', 'Mobil']")
     bildigi_diller: list[str] = Field(default_factory=list, description="Örn: ['Python', 'React']")
     bio: str = ""
+    butce_turu: str = Field(default="", description="Örn: 'Sabit Ücret' / 'Hisse' (metadata ön-filtreleme için)")
+    sektor: str = Field(default="", description="Örn: 'Fintech' (metadata ön-filtreleme için)")
 
 
 class GelistiriciVektorleYanit(BaseModel):
@@ -70,6 +72,10 @@ class SemantikAramaIstek(BaseModel):
     filtre_diller: list[str] | None = Field(
         default=None, description="Verilirse sadece bu dillerden birine sahip yazılımcılar aranır"
     )
+    filtre_metadata: dict[str, str] | None = Field(
+        default=None,
+        description="Örn: {'budget_type': 'Sabit Ücret', 'sektor': 'Fintech'} — pgvector aramasını ön-filtreler",
+    )
 
 
 class HibritAramaIstek(BaseModel):
@@ -78,6 +84,10 @@ class HibritAramaIstek(BaseModel):
         default=None, description="PRD'den çıkarılan beceri etiketleri (varsa)"
     )
     top_k: int = Field(default=5, ge=1, le=50)
+    filtre_metadata: dict[str, str] | None = Field(
+        default=None,
+        description="Örn: {'budget_type': 'Sabit Ücret', 'sektor': 'Fintech'} — hem semantik hem BM25 havuzunu ön-filtreler",
+    )
 
 
 class EslesmeSonucuYaniti(BaseModel):
@@ -124,6 +134,8 @@ def gelistirici_vektorle_endpoint(istek: GelistiriciVektorleIstek) -> Gelistiric
             uzmanlik_alanlari=istek.uzmanlik_alanlari,
             bildigi_diller=istek.bildigi_diller,
             bio=istek.bio,
+            butce_turu=istek.butce_turu,
+            sektor=istek.sektor,
         )
         gelistirici_profilini_vektorle(profil)
         return GelistiriciVektorleYanit(
@@ -159,6 +171,7 @@ def semantik_arama_endpoint(istek: SemantikAramaIstek) -> AramaYaniti:
             prd_metni=istek.prd_metni,
             top_k=istek.top_k,
             filtre_diller=istek.filtre_diller,
+            filtre_metadata=istek.filtre_metadata,
         )
         return AramaYaniti(
             sonuc_sayisi=len(sonuclar),
@@ -193,6 +206,7 @@ def hibrit_arama_endpoint(istek: HibritAramaIstek) -> AramaYaniti:
             prd_metni=istek.prd_metni,
             gerekli_diller=istek.gerekli_diller,
             top_k=istek.top_k,
+            filtre_metadata=istek.filtre_metadata,
         )
         return AramaYaniti(
             sonuc_sayisi=len(sonuclar),

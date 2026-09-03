@@ -110,6 +110,8 @@ class GelistiriciProfili:
     uzmanlik_alanlari: list[str] = field(default_factory=list)  # örn: ["Backend", "Mobil"]
     bildigi_diller: list[str] = field(default_factory=list)     # örn: ["Python", "React", "Go"]
     bio: str = ""
+    butce_turu: str = ""       # örn: "Sabit Ücret" / "Hisse" — metadata ön-filtreleme için
+    sektor: str = ""           # örn: "Fintech" — metadata ön-filtreleme için
 
     def embedding_metnine_donustur(self) -> str:
         """
@@ -215,6 +217,30 @@ def _supabase_client_getir() -> Client:
     return create_client(url, key)
 
 
+def _migration_ipucu(exc: Exception) -> str:
+    """
+    `budget_type`/`sektor` kolonları veya RPC parametreleri henüz Supabase'de
+    yoksa Postgres bir "column does not exist" / "function ... does not exist"
+    hatası döner. Kullanıcıya çıplak Postgres hatası yerine ne yapması
+    gerektiğini söyleyelim.
+    """
+    metin = str(exc).lower()
+    if "could not choose the best candidate function" in metin:
+        return (
+            " (İpucu: match_developers fonksiyonunun hem eski 3 parametreli "
+            "hem yeni 5 parametreli hâli Supabase'de aynı anda duruyor. "
+            "supabase_migration_metadata_filter.sql dosyasındaki 3. adımdaki "
+            "'drop function' komutunu çalıştırıp eski overload'ı silin.)"
+        )
+    if "budget_type" in metin or "sektor" in metin or "does not exist" in metin:
+        return (
+            " (İpucu: 'budget_type'/'sektor' metadata ön-filtresi için "
+            "supabase_migration_metadata_filter.sql dosyasını Supabase SQL "
+            "Editor'de çalıştırdınız mı?)"
+        )
+    return ""
+
+
 def _metni_embeddinge_cevir(metin: str) -> list[float]:
     if not metin or not metin.strip():
         raise VektorlemeHatasi("Embedding'e çevrilecek metin boş olamaz.")
@@ -271,16 +297,26 @@ def gelistirici_profilini_vektorle(gelistirici: GelistiriciProfili) -> bool:
                 "supabase_schema.sql içindeki vector(...) boyutunu kontrol edin."
             )
 
+        kayit = {
+            "developer_id": gelistirici.developer_id,
+            "full_name": gelistirici.ad_soyad,
+            "skills": gelistirici.tum_skiller,
+            "bio": gelistirici.bio,
+            "kaynak_metin": kaynak_metin,
+            "embedding": vektor,
+        }
+        # budget_type/sektor kolonlarını SADECE gerçekten dolu geldiyse
+        # gönderiyoruz: migration henüz çalıştırılmamış ortamlarda bu
+        # alanlar hiç kullanılmayan çağrıların eskisi gibi çalışmaya devam
+        # etmesi için (geriye dönük uyumluluk).
+        if gelistirici.butce_turu:
+            kayit["budget_type"] = gelistirici.butce_turu
+        if gelistirici.sektor:
+            kayit["sektor"] = gelistirici.sektor
+
         supabase = _supabase_client_getir()
         supabase.table("developer_embeddings").upsert(
-            {
-                "developer_id": gelistirici.developer_id,
-                "full_name": gelistirici.ad_soyad,
-                "skills": gelistirici.tum_skiller,
-                "bio": gelistirici.bio,
-                "kaynak_metin": kaynak_metin,
-                "embedding": vektor,
-            },
+            kayit,
             on_conflict="developer_id",  # aynı geliştirici tekrar vektörlenirse güncelle
         ).execute()
 
@@ -291,7 +327,7 @@ def gelistirici_profilini_vektorle(gelistirici: GelistiriciProfili) -> bool:
         raise  # kendi hata tiplerimizi olduğu gibi yukarı taşı
     except Exception as exc:  # beklenmeyen (network, supabase, model) hataları sarmala
         logger.exception("Geliştirici vektörlenirken beklenmeyen hata: %s", gelistirici.developer_id)
-        raise VektorlemeHatasi(f"Vektörleme başarısız oldu: {exc}") from exc
+        raise VektorlemeHatasi(f"Vektörleme başarısız oldu: {exc}{_migration_ipucu(exc)}") from exc
 
 
 # ============================================================================
@@ -302,6 +338,7 @@ def en_uygun_gelistiricileri_bul(
     prd_metni: str,
     top_k: int = VARSAYILAN_TOP_K,
     filtre_diller: Optional[list[str]] = None,
+    filtre_metadata: Optional[dict[str, str]] = None,
 ) -> list[EslesmeSonucu]:
     """
     PRD metnini embedding'e çevirir ve pgvector'de kosinüs benzerliğine göre
@@ -313,6 +350,12 @@ def en_uygun_gelistiricileri_bul(
     top_k: Kaç sonuç döneceği (varsayılan 5).
     filtre_diller: Verilirse, sadece bu dillerden en az birine sahip
                    yazılımcılar aday havuzuna girer (örn. ["React"]).
+    filtre_metadata: Verilirse (örn. {"budget_type": "Sabit Ücret", "sektor":
+                   "Fintech"}), pgvector aramasını RPC seviyesinde bu
+                   alanlara göre daraltır (bkz. match_developers RPC'sindeki
+                   filter_budget_type/filter_sektor parametreleri —
+                   supabase_migration_metadata_filter.sql çalıştırılmış
+                   olmalı).
 
     Dönüş
     -----
@@ -325,15 +368,23 @@ def en_uygun_gelistiricileri_bul(
 
         sorgu_vektoru = _metni_embeddinge_cevir(prd_metni)
         supabase = _supabase_client_getir()
+        filtre_metadata = filtre_metadata or {}
 
-        yanit = supabase.rpc(
-            "match_developers",
-            {
-                "query_embedding": sorgu_vektoru,
-                "match_count": top_k,
-                "filter_skills": filtre_diller,
-            },
-        ).execute()
+        rpc_parametreleri = {
+            "query_embedding": sorgu_vektoru,
+            "match_count": top_k,
+            "filter_skills": filtre_diller,
+        }
+        # Yeni filter_budget_type/filter_sektor parametrelerini SADECE
+        # gerçekten kullanılıyorsa ekliyoruz: migration henüz çalıştırılmamış
+        # (RPC'de bu parametreler tanımlı değil) ortamlarda filtresiz çağrının
+        # eskisi gibi çalışmaya devam etmesi için (geriye dönük uyumluluk).
+        if filtre_metadata.get("budget_type"):
+            rpc_parametreleri["filter_budget_type"] = filtre_metadata["budget_type"]
+        if filtre_metadata.get("sektor"):
+            rpc_parametreleri["filter_sektor"] = filtre_metadata["sektor"]
+
+        yanit = supabase.rpc("match_developers", rpc_parametreleri).execute()
 
         sonuclar = [
             EslesmeSonucu(
@@ -354,7 +405,7 @@ def en_uygun_gelistiricileri_bul(
         raise
     except Exception as exc:
         logger.exception("Semantik arama sırasında beklenmeyen hata.")
-        raise AramaHatasi(f"Semantik arama başarısız oldu: {exc}") from exc
+        raise AramaHatasi(f"Semantik arama başarısız oldu: {exc}{_migration_ipucu(exc)}") from exc
 
 
 # ============================================================================
@@ -384,21 +435,32 @@ def _bm25_icin_metni_hazirla(skills: list[str], bio: str) -> str:
     return " ".join([*skills, *skills, bio or ""]).lower()  # skills 2x tekrar = hafif ağırlıklandırma
 
 
-def _tum_gelistirici_havuzunu_getir(limit: int = BM25_ADAY_HAVUZU_BOYUTU) -> list[dict]:
+def _tum_gelistirici_havuzunu_getir(
+    limit: int = BM25_ADAY_HAVUZU_BOYUTU,
+    filtre_metadata: Optional[dict[str, str]] = None,
+) -> list[dict]:
     """
     BM25 indeksini kurmak için veritabanındaki geliştirici havuzunu çeker.
+    `filtre_metadata` verilirse (örn. {"budget_type": "Sabit Ücret"}), havuz
+    baştan bu alanlara göre daraltılır.
+
     Not: Havuz çok büyürse (binlerce yazılımcı) bunu periyodik olarak
     önbelleğe almak (örn. Redis, ya da birkaç dakikalık in-memory cache)
     performans için önerilir — MVP ölçeğinde (onlarca/yüzlerce kayıt)
     doğrudan sorgulamak yeterlidir.
     """
+    filtre_metadata = filtre_metadata or {}
     supabase = _supabase_client_getir()
-    yanit = (
-        supabase.table("developer_embeddings")
-        .select("developer_id, full_name, skills, bio")
-        .limit(limit)
-        .execute()
-    )
+    # budget_type/sektor kolonlarını SADECE gerçekten filtreleniyorsa
+    # select'e ekliyoruz: migration henüz çalıştırılmamış ortamlarda
+    # filtresiz çağrının eskisi gibi çalışmaya devam etmesi için.
+    kolonlar = "developer_id, full_name, skills, bio"
+    if filtre_metadata:
+        kolonlar += ", budget_type, sektor"
+    sorgu = supabase.table("developer_embeddings").select(kolonlar).limit(limit)
+    for kolon, deger in filtre_metadata.items():
+        sorgu = sorgu.eq(kolon, deger)
+    yanit = sorgu.execute()
     return yanit.data or []
 
 
@@ -407,6 +469,7 @@ def hibrit_eslestirme_yap(
     gerekli_diller: Optional[list[str]] = None,
     top_k: int = VARSAYILAN_TOP_K,
     semantik_aday_sayisi: int = 20,
+    filtre_metadata: Optional[dict[str, str]] = None,
 ) -> list[EslesmeSonucu]:
     """
     Semantik (vektör) arama + BM25 anahtar kelime aramasını RRF ile
@@ -423,6 +486,9 @@ def hibrit_eslestirme_yap(
     semantik_aday_sayisi: RRF'ye girecek aday sayısını artırmak için
                            semantik aramadan kaç sonuç çekileceği (top_k'dan
                            büyük tutulması önerilir, ör. 20).
+    filtre_metadata: Verilirse (örn. {"budget_type": "Sabit Ücret", "sektor":
+                    "Fintech"}), hem semantik hem BM25 aday havuzu baştan bu
+                    alanlara göre daraltılır.
 
     Dönüş
     -----
@@ -434,7 +500,7 @@ def hibrit_eslestirme_yap(
 
         # --- 1) Semantik aday listesi -----------------------------------
         semantik_sonuclar = en_uygun_gelistiricileri_bul(
-            prd_metni, top_k=semantik_aday_sayisi
+            prd_metni, top_k=semantik_aday_sayisi, filtre_metadata=filtre_metadata
         )
         semantik_sira = {
             s.developer_id: rank for rank, s in enumerate(semantik_sonuclar, start=1)
@@ -442,7 +508,7 @@ def hibrit_eslestirme_yap(
         semantik_detay = {s.developer_id: s for s in semantik_sonuclar}
 
         # --- 2) BM25 aday listesi ----------------------------------------
-        havuz = _tum_gelistirici_havuzunu_getir()
+        havuz = _tum_gelistirici_havuzunu_getir(filtre_metadata=filtre_metadata)
         if not havuz:
             logger.warning("BM25 için geliştirici havuzu boş, sadece semantik sonuçlar döndürülüyor.")
             return semantik_sonuclar[:top_k]
@@ -518,7 +584,7 @@ def hibrit_eslestirme_yap(
         raise
     except Exception as exc:
         logger.exception("Hibrit eşleştirme sırasında beklenmeyen hata.")
-        raise AramaHatasi(f"Hibrit eşleştirme başarısız oldu: {exc}") from exc
+        raise AramaHatasi(f"Hibrit eşleştirme başarısız oldu: {exc}{_migration_ipucu(exc)}") from exc
 
 
 # ============================================================================
